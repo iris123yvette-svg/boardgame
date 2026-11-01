@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桌游评分数据面板</title>
+    <script src="/js/echarts.min.js"></script>
+    <style>
+        :root {
+            --bg: #f4f5fa;
+            --card: #ffffff;
+            --border: #e8eaf3;
+            --text: #101828;
+            --muted: #7b849c;
+            --primary: #5b5bd6;
+            --primary-soft: #eef0ff;
+            --teal: #0d9488;
+            --amber: #f59e0b;
+            --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 28px -16px rgba(16, 24, 40, .18);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+            "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #d9dded; border-radius: 8px; border: 3px solid var(--bg); }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        .app { display: flex; min-height: 100vh; align-items: stretch; }
+
+        /* ============ 侧边栏 ============ */
+        .sidebar {
+            width: 272px;
+            flex: 0 0 272px;
+            background: #fbfbfe;
+            border-right: 1px solid var(--border);
+            padding: 22px 20px 28px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .brand { display: flex; gap: 12px; align-items: center; margin-bottom: 26px; }
+
+        .brand .logo {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: grid; place-items: center;
+            font-size: 21px;
+            background: linear-gradient(135deg, #6d6be8, #a5a3f5);
+            box-shadow: 0 6px 16px -6px rgba(91, 91, 214, .7);
+        }
+
+        .brand h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .2px; }
+        .brand p { margin: 0; font-size: 11.5px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
+
+        .filter-group-title {
+            font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+            color: var(--muted); text-transform: uppercase;
+            margin: 0 0 14px;
+        }
+
+        .filter { margin-bottom: 18px; }
+
+        .filter > label {
+            display: flex; justify-content: space-between; align-items: baseline;
+            font-size: 12.5px; color: #475069; margin-bottom: 8px; font-weight: 500;
+        }
+
+        .filter > label b { color: var(--primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+        .row2 { display: flex; align-items: center; gap: 8px; }
+        .row2 span { color: var(--muted); font-size: 12px; }
+
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: #fff;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .15s, box-shadow .15s;
+        }
+
+        input[type="number"]:focus, input[type="text"]:focus {
+            border-color: #a5a3f5;
+            box-shadow: 0 0 0 3px rgba(91, 91, 214, .12);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 3px;
+            background: #e3e6f2;
+            outline: none;
+            margin: 6px 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px; height: 15px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid var(--primary);
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(16, 24, 40, .18);
+        }
+
+        .hint {
+            font-size: 11.5px;
+            color: var(--muted);
+            line-height: 1.7;
+            margin-top: -4px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 9px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: #475069;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+        .btn:hover { border-color: #c9c7f7; color: var(--primary); background: var(--primary-soft); }
+
+        .dataset {
+            margin-top: 22px;
+            padding: 12px 13px;
+            border-radius: 10px;
+            background: var(--primary-soft);
+            font-size: 12px;
+            color: #4b4b9e;
+            line-height: 1.6;
+        }
+
+        .dataset b { font-size: 14px; }
+
+        .ds-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+        .ds-row code {
+            font-size: 11px;
+            color: #4b4b9e;
+            word-break: break-all;
+            text-align: right;
+            line-height: 1.45;
+        }
+
+        .ds-actions { display: flex; gap: 8px; margin-top: 10px; }
+        .ds-actions .btn { padding: 6px 8px; font-size: 12px; flex: 1; background: #fff; border-color: #d9d9f5; }
+        .ds-tip { margin: 8px 0 0; font-size: 11px; color: #6f6fb8; }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 28px;
+            transform: translate(-50%, 20px);
+            background: rgba(16, 24, 40, .94);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            box-shadow: 0 12px 30px -10px rgba(16, 24, 40, .6);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .22s, transform .22s;
+            z-index: 60;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+        .toast.err { background: #b42318; }
+
+        /* ============ 主区域 ============ */
+        main { flex: 1; min-width: 0; padding: 24px 28px 40px; position: relative; }
+
+        .progress {
+            position: fixed; top: 0; left: 272px; right: 0; height: 2px;
+            background: transparent; z-index: 30; opacity: 0; transition: opacity .2s;
+        }
+        .progress.on { opacity: 1; }
+        .progress::after {
+            content: ""; display: block; height: 2px; width: 40%;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            animation: slide 1.1s infinite ease-in-out;
+        }
+        @keyframes slide { 0% { transform: translateX(-60%); } 100% { transform: translateX(300%); } }
+
+        .topbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .topbar h2 { margin: 0 0 6px; font-size: 21px; letter-spacing: -.2px; }
+        .topbar p { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+        .chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 11px; border-radius: 999px;
+            background: #fff; border: 1px solid var(--border);
+            font-size: 12px; color: #475069;
+        }
+        .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.16); }
+
+        /* KPI */
+        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+
+        .kpi {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 18px;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi::after {
+            content: ""; position: absolute; right: -30px; top: -30px;
+            width: 90px; height: 90px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(91,91,214,.10), transparent 70%);
+        }
+
+        .kpi .k-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+        .kpi .k-value { font-size: 27px; font-weight: 650; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+        .kpi .k-value small { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+        .kpi .k-sub { margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+
+        /* 图表网格 */
+        .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 18px 10px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+        .card-head h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+        .card-head p { margin: 0; font-size: 11.5px; color: var(--muted); }
+        .tag {
+            font-size: 11px; padding: 3px 8px; border-radius: 6px;
+            background: #f5f6fb; color: #6b7391; border: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .chart { width: 100%; height: 292px; }
+        .chart.tall { height: 430px; }
+
+        .col-7 { grid-column: span 7; }
+        .col-6 { grid-column: span 6; }
+        .col-5 { grid-column: span 5; }
+        .col-12 { grid-column: span 12; }
+
+        /* 搜索结果表 */
+        .table-wrap { overflow: auto; max-height: 360px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        thead th {
+            position: sticky; top: 0; z-index: 1;
+            background: #fafbff; color: var(--muted); font-weight: 600;
+            text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border);
+            white-space: nowrap; font-size: 11.5px; letter-spacing: .4px;
+        }
+        tbody td { padding: 9px 12px; border-bottom: 1px solid #f4f5fa; color: #2b3448; }
+        tbody tr:hover td { background: #fafbff; }
+        td.num { font-variant-numeric: tabular-nums; }
+        .rank-badge {
+            display: inline-block; min-width: 26px; text-align: center;
+            padding: 2px 6px; border-radius: 6px;
+            background: var(--primary-soft); color: #4b4b9e; font-size: 11.5px; font-weight: 600;
+        }
+
+        .empty {
+            display: none;
+            margin: 8px 0 4px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            font-size: 12.5px;
+        }
+        .empty.show { display: block; }
+
+        footer { margin-top: 22px; color: var(--muted); font-size: 11.5px; line-height: 1.8; }
+
+        @media (max-width: 1280px) {
+            .kpis { grid-template-columns: repeat(2, 1fr); }
+            .col-7, .col-6, .col-5 { grid-column: span 12; }
+        }
+
+        @media (max-width: 900px) {
+            .app { flex-direction: column; }
+            .sidebar { position: static; width: 100%; flex: none; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+            main { padding: 18px; }
+            .progress { left: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<div class="app">
+    <!-- ================= 侧边栏：筛选器 ================= -->
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="logo">🎲</div>
+            <div>
+                <h1>桌游数据面板</h1>
+                <p>Board Game Ratings</p>
+            </div>
+        </div>
+
+        <p class="filter-group-title">筛选条件</p>
+
+        <div class="filter">
+            <label>发行年份区间</label>
+            <div class="row2">
+                <input type="number" id="yearStart" min="1950" max="2021" step="1" value="1990">
+                <span>—</span>
+                <input type="number" id="yearEnd" min="1950" max="2021" step="1" value="2021">
+            </div>
+        </div>
+
+        <div class="filter">
+            <label>最少评分人数 <b id="minUsersVal">0</b></label>
+            <input type="range" id="minUsers" min="0" max="20000" step="250" value="0">
+            <div class="hint">过滤掉过于冷门的游戏，人数越多样本越可信</div>
+        </div>
+
+        <div class="filter">
+            <label>评分区间 <b id="ratingVal">0.0 – 10.0</b></label>
+            <input type="range" id="ratingMin" min="0" max="10" step="0.1" value="0">
+            <input type="range" id="ratingMax" min="0" max="10" step="0.1" value="10">
+        </div>
+
+        <div class="filter">
+            <label>Top N 排行 <b id="topNVal">20</b></label>
+            <input type="range" id="topN" min="5" max="50" step="5" value="20">
+        </div>
+
+        <div class="filter">
+            <label>名称搜索</label>
+            <input type="text" id="search" placeholder="例如：Splendor、Azul">
+        </div>
+
+        <button class="btn" id="resetBtn">重置全部筛选</button>
+
+        <div class="dataset">
+            <div class="ds-row">
+                <span>数据源</span>
+                <code id="dataSource" th:text="${dataPath}">classpath:boardgame_ratings.csv</code>
+            </div>
+            <div class="ds-row">
+                <span>有效记录</span>
+                <b id="datasetSize" th:text="${datasetSize}">2400</b>
+            </div>
+            <div class="ds-actions">
+                <button class="btn" id="reloadBtn" type="button">重新加载</button>
+                <button class="btn" id="uploadBtn" type="button">上传 CSV</button>
+                <input type="file" id="fileInput" accept=".csv,text/csv" hidden>
+            </div>
+            <p class="ds-tip">已剔除 year 超出 1950–2021 的脏数据</p>
+        </div>
+    </aside>
+
+    <!-- ================= 主区域 ================= -->
+    <main>
+        <div class="topbar">
+            <div>
+                <h2>市场概览</h2>
+                <p id="subtitle">正在加载数据…</p>
+            </div>
+            <div class="chip"><span class="dot"></span><span id="statusText">已连接 /api/dashboard</span></div>
+        </div>
+
+        <div class="empty" id="emptyTip">当前筛选条件下没有匹配的游戏，请放宽年份、人数或评分范围。</div>
+
+        <!-- KPI 指标卡 -->
+        <section class="kpis">
+            <div class="kpi">
+                <div class="k-label">筛选后游戏数量</div>
+                <div class="k-value" id="kpiTotal">–<small>款</small></div>
+                <div class="k-sub">当前筛选条件内</div>
+            </div>
+            <div class="kpi">
+                <div class="k-label">平均评分</div>
+                <div class="k-value" id="kpiAvg">–</div>
+                <div class="k-sub">全部样本算术平均</div>
+            </div>
+            <div class="kpi">
+                <div class="k-label">最高评分</div>
+                <div class="k-value" id="kpiMax">–</div>
+                <div class="k-sub">单款游戏最高均分</div>
+            </div>
+            <div class="kpi">
+                <div class="k-label">累计评分人次</div>
+                <div class="k-value" id="kpiUsers">–</div>
+                <div class="k-sub">users_rated 求和</div>
+            </div>
+        </section>
+
+        <!-- 图表区 -->
+        <section class="grid">
+            <div class="card col-7">
+                <div class="card-head">
+                    <div>
+                        <h3>每年发行数量</h3>
+                        <p>按发行年份统计的游戏款数，反映行业增长节奏</p>
+                    </div>
+                    <span class="tag">图 1</span>
+                </div>
+                <div class="chart" id="chartYearlyCount"></div>
+            </div>
+
+            <div class="card col-5">
+                <div class="card-head">
+                    <div>
+                        <h3>每年平均评分</h3>
+                        <p>年度平均分走势，观察口碑变化</p>
+                    </div>
+                    <span class="tag">图 2</span>
+                </div>
+                <div class="chart" id="chartYearlyAvg"></div>
+            </div>
+
+            <div class="card col-5">
+                <div class="card-head">
+                    <div>
+                        <h3>评分分布直方图</h3>
+                        <p>50 个等宽区间，看评分集中在哪个档位</p>
+                    </div>
+                    <span class="tag">图 4</span>
+                </div>
+                <div class="chart" id="chartHistogram"></div>
+            </div>
+
+            <div class="card col-7">
+                <div class="card-head">
+                    <div>
+                        <h3>评分人数 vs 平均评分</h3>
+                        <p>横轴为对数刻度，颜色映射发行年份</p>
+                    </div>
+                    <span class="tag">图 6</span>
+                </div>
+                <div class="chart" id="chartScatter"></div>
+            </div>
+
+            <div class="card col-6">
+                <div class="card-head">
+                    <div>
+                        <h3>Top N 高分榜</h3>
+                        <p>当前筛选下的评分排行</p>
+                    </div>
+                    <span class="tag">图 5</span>
+                </div>
+                <div class="chart tall" id="chartTopN"></div>
+            </div>
+
+            <div class="card col-6">
+                <div class="card-head">
+                    <div>
+                        <h3>各年代评分分布（箱线图）</h3>
+                        <p>箱体为四分位区间，菱形为均值，灰点为离群值</p>
+                    </div>
+                    <span class="tag">图 7</span>
+                </div>
+                <div class="chart tall" id="chartBox"></div>
+            </div>
+
+            <div class="card col-12" id="searchCard" style="display:none;">
+                <div class="card-head">
+                    <div>
+                        <h3>名称搜索结果</h3>
+                        <p id="searchSub">最多返回 20 条</p>
+                    </div>
+                    <span class="tag">Search</span>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>名称</th>
+                            <th>年份</th>
+                            <th>平均分</th>
+                            <th>贝叶斯均分</th>
+                            <th>评分人数</th>
+                        </tr>
+                        </thead>
+                        <tbody id="searchBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            数据来源：<code>classpath:boardgame_ratings.csv</code>（示例数据集，按 BGG 榜单字段结构生成） ·
+            接口：<code>GET /api/dashboard</code> · 图表渲染：ECharts 5.5（本地 static/js/echarts.min.js）
+        </footer>
+    </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+    /* =========================================================
+     *  常量与工具
+     * ========================================================= */
+    const PALETTE = {
+        primary: '#5b5bd6',
+        primaryLight: '#b9b7f7',
+        teal: '#0d9488',
+        tealLight: '#9fe3d9',
+        amber: '#f59e0b',
+        text: '#101828',
+        muted: '#8a92a6',
+        grid: '#f1f3f9',
+        axis: '#e6e8f0'
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+
+    const el = {
+        yearStart: $('#yearStart'),
+        yearEnd: $('#yearEnd'),
+        minUsers: $('#minUsers'),
+        ratingMin: $('#ratingMin'),
+        ratingMax: $('#ratingMax'),
+        topN: $('#topN'),
+        search: $('#search'),
+        minUsersVal: $('#minUsersVal'),
+        ratingVal: $('#ratingVal'),
+        topNVal: $('#topNVal'),
+        subtitle: $('#subtitle'),
+        statusText: $('#statusText'),
+        emptyTip: $('#emptyTip'),
+        progress: $('#progress')
+    };
+
+    const charts = {};
+
+    function chart(id) {
+        if (!charts[id]) {
+            charts[id] = echarts.init(document.getElementById(id), null, { renderer: 'canvas' });
+        }
+        return charts[id];
+    }
+
+    function axisStyle(extra) {
+        return Object.assign({
+            axisLine: { lineStyle: { color: PALETTE.axis } },
+            axisTick: { show: false },
+            axisLabel: { color: PALETTE.muted, fontSize: 11 },
+            splitLine: { lineStyle: { color: PALETTE.grid, type: 'dashed' } }
+        }, extra || {});
+    }
+
+    function fmtInt(n) {
+        return Number(n || 0).toLocaleString('zh-CN');
+    }
+
+    function fmtCompact(n) {
+        n = Number(n || 0);
+        if (n >= 1e8) return (n / 1e8).toFixed(2) + '<small>亿</small>';
+        if (n >= 1e4) return (n / 1e4).toFixed(1) + '<small>万</small>';
+        return fmtInt(n);
+    }
+
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    /** 分位计算（线性插值），用于箱线图 */
+    function quantile(sorted, q) {
+        if (!sorted.length) return 0;
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        return sorted[base + 1] !== undefined
+            ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+            : sorted[base];
+    }
+
+    /** 根据数据算出留白后的纵轴范围，刻度对齐到 0.5，避免固定 min/max 造成大片空白 */
+    function niceRange(values, pad) {
+        if (!values || !values.length) return { min: 0, max: 10 };
+        const min = Math.min.apply(null, values);
+        const max = Math.max.apply(null, values);
+        return {
+            min: Math.floor((min - pad) * 2) / 2,
+            max: Math.ceil((max + pad) * 2) / 2
+        };
+    }
+
+    /* =========================================================
+     *  筛选状态
+     * ========================================================= */
+    function readFilters() {
+        let ys = parseInt(el.yearStart.value, 10) || 1950;
+        let ye = parseInt(el.yearEnd.value, 10) || 2021;
+        if (ys > ye) { const t = ys; ys = ye; ye = t; }
+
+        let rMin = parseFloat(el.ratingMin.value);
+        let rMax = parseFloat(el.ratingMax.value);
+        if (rMin > rMax) { const t = rMin; rMin = rMax; rMax = t; }
+
+        return {
+            yearStart: ys,
+            yearEnd: ye,
+            minUsers: parseInt(el.minUsers.value, 10) || 0,
+            ratingMin: rMin,
+            ratingMax: rMax,
+            topN: parseInt(el.topN.value, 10) || 20,
+            search: el.search.value.trim()
+        };
+    }
+
+    function syncLabels() {
+        el.minUsersVal.textContent = fmtInt(el.minUsers.value) + ' 人';
+        el.ratingVal.textContent = Number(el.ratingMin.value).toFixed(1) + ' – ' + Number(el.ratingMax.value).toFixed(1);
+        el.topNVal.textContent = el.topN.value;
+    }
+
+    /** 支持用 URL 参数还原筛选状态，便于分享某一次分析视角 */
+    function applyUrlParams() {
+        const p = new URLSearchParams(location.search);
+        const map = {
+            yearStart: el.yearStart, yearEnd: el.yearEnd, minUsers: el.minUsers,
+            ratingMin: el.ratingMin, ratingMax: el.ratingMax, topN: el.topN, search: el.search
+        };
+        Object.keys(map).forEach((k) => {
+            if (p.has(k) && p.get(k) !== '') map[k].value = p.get(k);
+        });
+    }
+
+    function pushUrlParams(f) {
+        const p = new URLSearchParams({
+            yearStart: f.yearStart, yearEnd: f.yearEnd, minUsers: f.minUsers,
+            ratingMin: f.ratingMin, ratingMax: f.ratingMax, topN: f.topN
+        });
+        if (f.search) p.set('search', f.search);
+        history.replaceState(null, '', location.pathname + '?' + p.toString());
+    }
+
+    /* =========================================================
+     *  数据加载
+     * ========================================================= */
+    let controller = null;
+    let timer = null;
+    let reqSeq = 0;
+
+    function scheduleLoad(delay) {
+        clearTimeout(timer);
+        timer = setTimeout(load, delay || 180);
+    }
+
+    async function load() {
+        const f = readFilters();
+        syncLabels();
+
+        if (controller) controller.abort();
+        controller = new AbortController();
+        const seq = ++reqSeq;
+
+        el.progress.classList.add('on');
+        el.statusText.textContent = '数据加载中…';
+
+        const params = new URLSearchParams({
+            yearStart: f.yearStart,
+            yearEnd: f.yearEnd,
+            minUsers: f.minUsers,
+            ratingMin: f.ratingMin,
+            ratingMax: f.ratingMax,
+            topN: f.topN,
+            search: f.search
+        });
+
+        try {
+            const res = await fetch('/api/dashboard?' + params.toString(), { signal: controller.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (seq !== reqSeq) return;
+            render(data, f);
+            pushUrlParams(f);
+            el.statusText.textContent = '已更新 · ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            el.statusText.textContent = '加载失败：' + e.message;
+        } finally {
+            if (seq === reqSeq) el.progress.classList.remove('on');
+        }
+    }
+
+    /* =========================================================
+     *  渲染
+     * ========================================================= */
+    function render(d, f) {
+        const total = d.totalGames || 0;
+        el.emptyTip.classList.toggle('show', total === 0);
+
+        // 数据源信息（上传 / 重载后同步侧栏）
+        if (d.dataPath) $('#dataSource').textContent = d.dataPath;
+        if (d.datasetSize != null) $('#datasetSize').textContent = d.datasetSize;
+
+        // 副标题
+        el.subtitle.textContent =
+            '年份 ' + f.yearStart + '–' + f.yearEnd +
+            ' · 评分人数 ≥ ' + fmtInt(f.minUsers) +
+            ' · 评分 ' + f.ratingMin.toFixed(1) + '–' + f.ratingMax.toFixed(1) +
+            ' · 命中 ' + fmtInt(total) + ' 款';
+
+        // KPI
+        $('#kpiTotal').innerHTML = fmtInt(total) + '<small>款</small>';
+        $('#kpiAvg').innerHTML = total ? (d.avgRating || 0).toFixed(2) + '<small>/ 10</small>' : '–';
+        $('#kpiMax').innerHTML = total ? (d.maxRating || 0).toFixed(2) + '<small>/ 10</small>' : '–';
+        $('#kpiUsers').innerHTML = total ? fmtCompact(d.totalUsers) : '–';
+
+        renderYearlyCount(d.yearlyCount || {});
+        renderYearlyAvg(d.yearlyAvg || {});
+        renderHistogram(d.histogram || []);
+        renderTopN(d.topGames || []);
+        renderScatter(d.scatter || []);
+        renderBox(d.boxData || {});
+        renderSearch(d.searchResults || [], f.search);
+    }
+
+    /* 图1：每年发行数量 */
+    function renderYearlyCount(map) {
+        const years = Object.keys(map).map(Number).sort((a, b) => a - b);
+        const values = years.map((y) => map[y]);
+
+        chart('chartYearlyCount').setOption({
+            grid: { left: 8, right: 16, top: 18, bottom: 6, containLabel: true },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => `<b>${p[0].axisValue}</b> 年<br/>发行 ${p[0].data} 款`
+            },
+            xAxis: axisStyle({
+                type: 'category',
+                data: years,
+                splitLine: { show: false },
+                axisLabel: {
+                    color: PALETTE.muted,
+                    fontSize: 11,
+                    interval: Math.max(0, Math.ceil(years.length / 12) - 1)
+                }
+            }),
+            yAxis: axisStyle({ type: 'value', name: '款', nameTextStyle: { color: PALETTE.muted, fontSize: 11 } }),
+            series: [{
+                type: 'bar',
+                data: values,
+                barMaxWidth: 14,
+                itemStyle: {
+                    borderRadius: [4, 4, 0, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#6d6be8' },
+                        { offset: 1, color: '#c9c7f9' }
+                    ])
+                },
+                emphasis: { itemStyle: { color: '#4f4fcf' } }
+            }]
+        }, true);
+    }
+
+    /* 图2：每年平均评分 */
+    function renderYearlyAvg(map) {
+        const years = Object.keys(map).map(Number).sort((a, b) => a - b);
+        const values = years.map((y) => Number(map[y].toFixed(3)));
+
+        chart('chartYearlyAvg').setOption({
+            grid: { left: 8, right: 18, top: 20, bottom: 6, containLabel: true },
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => `<b>${p[0].axisValue}</b> 年<br/>平均评分 ${p[0].data.toFixed(2)}`
+            },
+            xAxis: axisStyle({
+                type: 'category',
+                boundaryGap: false,
+                data: years,
+                splitLine: { show: false },
+                axisLabel: {
+                    color: PALETTE.muted,
+                    fontSize: 11,
+                    interval: Math.max(0, Math.ceil(years.length / 8) - 1)
+                }
+            }),
+            yAxis: axisStyle({ type: 'value', scale: true, name: '分', nameTextStyle: { color: PALETTE.muted, fontSize: 11 } }),
+            series: [{
+                type: 'line',
+                data: values,
+                smooth: true,
+                showSymbol: false,
+                lineStyle: { width: 2.5, color: PALETTE.teal },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: 'rgba(13,148,136,.28)' },
+                        { offset: 1, color: 'rgba(13,148,136,.02)' }
+                    ])
+                }
+            }]
+        }, true);
+    }
+
+    /* 图4：评分分布直方图 */
+    function renderHistogram(rows) {
+        const labels = rows.map((r) => r.bin);
+        const values = rows.map((r) => r.count);
+        const width = rows.length > 1 ? (Number(rows[1].bin) - Number(rows[0].bin)) : 0.1;
+
+        chart('chartHistogram').setOption({
+            grid: { left: 8, right: 16, top: 18, bottom: 6, containLabel: true },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => {
+                    const i = p[0].dataIndex;
+                    const from = Number(rows[i].bin);
+                    return `评分 ${from.toFixed(2)} – ${(from + width).toFixed(2)}<br/>共 <b>${p[0].data}</b> 款`;
+                }
+            },
+            xAxis: axisStyle({
+                type: 'category',
+                data: labels,
+                splitLine: { show: false },
+                axisLabel: {
+                    color: PALETTE.muted,
+                    fontSize: 11,
+                    interval: Math.max(0, Math.ceil(labels.length / 10) - 1)
+                }
+            }),
+            yAxis: axisStyle({ type: 'value', name: '款', nameTextStyle: { color: PALETTE.muted, fontSize: 11 } }),
+            series: [{
+                type: 'bar',
+                data: values,
+                barCategoryGap: '12%',
+                itemStyle: {
+                    borderRadius: [3, 3, 0, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#0d9488' },
+                        { offset: 1, color: '#a9e6dd' }
+                    ])
+                }
+            }]
+        }, true);
+    }
+
+    /* 图5：Top N 高分榜 */
+    function renderTopN(games) {
+        const sorted = games.slice().sort((a, b) => a.average - b.average);
+        const names = sorted.map((g) => g.name);
+        const values = sorted.map((g) => g.average);
+
+        chart('chartTopN').setOption({
+            grid: { left: 8, right: 56, top: 10, bottom: 6, containLabel: true },
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'shadow' },
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => {
+                    const g = sorted[p[0].dataIndex];
+                    return `<b>${esc(g.name)}</b><br/>年份 ${g.year} · 排名 #${g.rank}<br/>` +
+                        `平均分 ${g.average.toFixed(2)} · 贝叶斯 ${g.bayesAverage.toFixed(2)}<br/>` +
+                        `评分人数 ${fmtInt(g.usersRated)}`;
+                }
+            },
+            xAxis: axisStyle({ type: 'value', max: 10 }),
+            yAxis: axisStyle({
+                type: 'category',
+                data: names,
+                splitLine: { show: false },
+                axisLabel: { color: '#475069', fontSize: 11.5, width: 150, overflow: 'truncate' }
+            }),
+            series: [{
+                type: 'bar',
+                data: values,
+                barMaxWidth: 12,
+                itemStyle: {
+                    borderRadius: [0, 4, 4, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+                        { offset: 0, color: '#c9c7f9' },
+                        { offset: 1, color: '#5b5bd6' }
+                    ])
+                },
+                label: {
+                    show: true,
+                    position: 'right',
+                    color: '#475069',
+                    fontSize: 11,
+                    formatter: (p) => p.data.toFixed(2)
+                }
+            }]
+        }, true);
+    }
+
+    /* 图6：评分人数 vs 平均评分 */
+    function renderScatter(points) {
+        const data = points.map((p) => [p.x, p.y, p.year, p.name]);
+        const yr = niceRange(points.map((p) => p.y), 0.35);
+
+        chart('chartScatter').setOption({
+            grid: { left: 8, right: 30, top: 18, bottom: 46, containLabel: true },
+            tooltip: {
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => {
+                    const v = p.value;
+                    return `<b>${esc(v[3])}</b><br/>评分人数 ${fmtInt(v[0])}<br/>平均分 ${v[1].toFixed(2)} · ${v[2]} 年`;
+                }
+            },
+            visualMap: {
+                dimension: 2,
+                min: 1950,
+                max: 2021,
+                calculable: false,
+                orient: 'horizontal',
+                left: 'center',
+                bottom: 0,
+                itemWidth: 12,
+                itemHeight: 130,
+                text: ['新', '旧'],
+                textGap: 6,
+                textStyle: { color: PALETTE.muted, fontSize: 11 },
+                inRange: { color: ['#bfdbfe', '#818cf8', '#4338ca'] }
+            },
+            xAxis: axisStyle({
+                type: 'log',
+                name: '评分人数（对数）',
+                nameLocation: 'middle',
+                nameGap: 26,
+                nameTextStyle: { color: PALETTE.muted, fontSize: 11 },
+                minorTick: { show: false },
+                axisLabel: {
+                    color: PALETTE.muted,
+                    fontSize: 11,
+                    // 10 / 100 / 1k / 10k / 100k，避免末尾标签被裁切
+                    formatter: (v) => (v >= 1000 ? (v / 1000) + 'k' : String(v))
+                },
+                splitLine: { show: true, lineStyle: { color: PALETTE.grid, type: 'dashed' } }
+            }),
+            yAxis: axisStyle({
+                type: 'value',
+                name: '平均评分',
+                min: yr.min,
+                max: yr.max,
+                nameTextStyle: { color: PALETTE.muted, fontSize: 11 }
+            }),
+            series: [{
+                type: 'scatter',
+                data: data,
+                symbolSize: 5,
+                itemStyle: { opacity: 0.62 },
+                emphasis: { itemStyle: { opacity: 1, borderColor: '#312e81', borderWidth: 1 } },
+                progressive: 1200
+            }]
+        }, true);
+    }
+
+    /* 图7：年代箱线图 */
+    function renderBox(map) {
+        const decades = Object.keys(map).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        const boxes = [];
+        const outliers = [];
+        const means = [];
+        const stats = [];
+
+        decades.forEach((decade, idx) => {
+            const sorted = map[decade].slice().sort((a, b) => a - b);
+            if (!sorted.length) {
+                boxes.push([0, 0, 0, 0, 0]);
+                stats.push(null);
+                return;
+            }
+            const q1 = quantile(sorted, 0.25);
+            const median = quantile(sorted, 0.5);
+            const q3 = quantile(sorted, 0.75);
+            const iqr = q3 - q1;
+            const lowFence = q1 - 1.5 * iqr;
+            const highFence = q3 + 1.5 * iqr;
+            const inliers = sorted.filter((v) => v >= lowFence && v <= highFence);
+            const min = inliers.length ? inliers[0] : sorted[0];
+            const max = inliers.length ? inliers[inliers.length - 1] : sorted[sorted.length - 1];
+
+            boxes.push([+min.toFixed(2), +q1.toFixed(2), +median.toFixed(2), +q3.toFixed(2), +max.toFixed(2)]);
+            stats.push({ q1, median, q3, min, max, n: sorted.length });
+
+            sorted.forEach((v) => {
+                if (v < lowFence || v > highFence) outliers.push([idx, v]);
+            });
+            means.push([idx, +(sorted.reduce((s, v) => s + v, 0) / sorted.length).toFixed(2)]);
+        });
+
+        const allValues = decades.reduce((acc, d) => acc.concat(map[d] || []), []);
+        const yr = niceRange(allValues, 0.4);
+
+        chart('chartBox').setOption({
+            grid: { left: 8, right: 18, top: 34, bottom: 6, containLabel: true },
+            legend: {
+                top: 0,
+                right: 0,
+                itemWidth: 10,
+                itemHeight: 8,
+                textStyle: { color: PALETTE.muted, fontSize: 11 }
+            },
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(16,24,40,.92)',
+                borderWidth: 0,
+                textStyle: { color: '#fff', fontSize: 12 },
+                formatter: (p) => {
+                    // boxplot 的 p.value 是 [min, Q1, median, Q3, max]，年代名取自 p.name
+                    const decade = p.name;
+                    if (p.seriesName === '离群值') return `${decade} 年代离群值：${p.value[1].toFixed(2)}`;
+                    if (p.seriesName === '均值') return `${decade} 年代均值：${p.value[1].toFixed(2)}`;
+                    const s = stats[p.dataIndex];
+                    if (!s) return decade;
+                    return `<b>${decade} 年代</b><br/>样本 ${s.n} 款<br/>` +
+                        `最大 ${s.max.toFixed(2)} / Q3 ${s.q3.toFixed(2)}<br/>` +
+                        `中位数 ${s.median.toFixed(2)}<br/>` +
+                        `Q1 ${s.q1.toFixed(2)} / 最小 ${s.min.toFixed(2)}`;
+                }
+            },
+            xAxis: axisStyle({ type: 'category', data: decades, splitLine: { show: false } }),
+            yAxis: axisStyle({
+                type: 'value',
+                name: '评分',
+                min: yr.min,
+                max: yr.max,
+                nameTextStyle: { color: PALETTE.muted, fontSize: 11 }
+            }),
+            series: [
+                {
+                    name: '评分分布',
+                    type: 'boxplot',
+                    data: boxes,
+                    boxWidth: [12, 34],
+                    itemStyle: { color: '#eef0ff', borderColor: PALETTE.primary, borderWidth: 1.4 },
+                    emphasis: { itemStyle: { color: '#dcdcfb', borderColor: '#4f4fcf' } },
+                    tooltip: {
+                        backgroundColor: 'rgba(16,24,40,.92)',
+                        borderWidth: 0,
+                        textStyle: { color: '#fff', fontSize: 12 }
+                    }
+                },
+                {
+                    name: '离群值',
+                    type: 'scatter',
+                    data: outliers,
+                    symbolSize: 4,
+                    itemStyle: { color: '#c3c8d6', opacity: 0.85 }
+                },
+                {
+                    name: '均值',
+                    type: 'scatter',
+                    data: means,
+                    symbol: 'diamond',
+                    symbolSize: 9,
+                    itemStyle: { color: PALETTE.amber, borderColor: '#fff', borderWidth: 1.5 }
+                }
+            ]
+        }, true);
+    }
+
+    /* 搜索结果表 */
+    function renderSearch(results, keyword) {
+        const card = $('#searchCard');
+        const body = $('#searchBody');
+
+        if (!keyword) {
+            card.style.display = 'none';
+            body.innerHTML = '';
+            return;
+        }
+
+        card.style.display = '';
+        $('#searchSub').textContent = '关键词「' + keyword + '」，当前筛选内命中 ' + results.length + ' 条（最多 20）';
+
+        if (!results.length) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#8a92a6;padding:22px;">没有匹配的游戏名称</td></tr>';
+            return;
+        }
+
+        body.innerHTML = results.map((g) => `
+            <tr>
+                <td><span class="rank-badge">#${g.rank}</span></td>
+                <td>${esc(g.name)}</td>
+                <td class="num">${g.year}</td>
+                <td class="num">${g.average.toFixed(2)}</td>
+                <td class="num">${g.bayesAverage.toFixed(2)}</td>
+                <td class="num">${fmtInt(g.usersRated)}</td>
+            </tr>`).join('');
+    }
+
+    /* =========================================================
+     *  事件绑定
+     * ========================================================= */
+    ['yearStart', 'yearEnd'].forEach((k) => {
+        el[k].addEventListener('change', () => scheduleLoad(0));
+        el[k].addEventListener('input', () => scheduleLoad(320));
+    });
+
+    ['minUsers', 'ratingMin', 'ratingMax', 'topN'].forEach((k) => {
+        el[k].addEventListener('input', () => { syncLabels(); scheduleLoad(120); });
+    });
+
+    el.search.addEventListener('input', () => scheduleLoad(280));
+
+    $('#resetBtn').addEventListener('click', () => {
+        el.yearStart.value = 1990;
+        el.yearEnd.value = 2021;
+        el.minUsers.value = 0;
+        el.ratingMin.value = 0;
+        el.ratingMax.value = 10;
+        el.topN.value = 20;
+        el.search.value = '';
+        syncLabels();
+        load();
+    });
+
+    /* =========================================================
+     *  数据源操作：重新加载当前文件 / 上传本地 CSV
+     * ========================================================= */
+    let toastTimer = null;
+
+    function toast(msg, isError) {
+        const t = $('#toast');
+        t.textContent = msg;
+        t.className = 'toast show' + (isError ? ' err' : '');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { t.className = 'toast' + (isError ? ' err' : ''); }, 3600);
+    }
+
+    async function dataSourceAction(url, options) {
+        try {
+            const res = await fetch(url, options);
+            const r = await res.json();
+            if (!r.ok) {
+                toast(r.message || '操作失败', true);
+                return;
+            }
+            $('#dataSource').textContent = r.source;
+            $('#datasetSize').textContent = r.loaded;
+            toast(`已加载 ${r.loaded} 条（越界丢弃 ${r.skippedDirty}，格式错误跳过 ${r.skippedInvalid}）`);
+            load();
+        } catch (e) {
+            toast('请求失败：' + e.message, true);
+        }
+    }
+
+    $('#reloadBtn').addEventListener('click', () => dataSourceAction('/api/reload', { method: 'POST' }));
+    $('#uploadBtn').addEventListener('click', () => $('#fileInput').click());
+    $('#fileInput').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        dataSourceAction('/api/upload', { method: 'POST', body: fd });
+        e.target.value = '';
+    });
+
+    window.addEventListener('resize', () => {
+        Object.values(charts).forEach((c) => c.resize());
+    });
+
+    /* 启动 */
+    applyUrlParams();
+    syncLabels();
+    load();
+</script>
+</body>
+</html>

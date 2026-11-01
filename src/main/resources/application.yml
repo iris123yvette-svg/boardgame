@@ -1,0 +1,27 @@
+# 端口只在这里定义一次，改这一行即可（被占用就换成 8081 / 8090 …）
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: boardgame-dashboard
+  thymeleaf:
+    cache: false
+    encoding: UTF-8
+  jackson:
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+boardgame:
+  data-path: "D:/ratings.csv"
+
+logging:
+  level:
+    com.example.dashboard: INFO
